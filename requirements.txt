@@ -1,0 +1,9 @@
+fastapi
+pydantic
+uvicorn
+requests
+loguru
+pydantic-settings
+openai
+httpx
+psycopg2

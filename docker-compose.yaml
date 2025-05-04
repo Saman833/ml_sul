@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: student
+      POSTGRES_PASSWORD: student_pass
+      POSTGRES_DB: chat_db
+    volumes:
+      - postgres_data_1:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - student_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U student -d chat_db || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  gptbot:
+    build: .
+    container_name: gptbot
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8672:8672"
+    volumes:
+      - logs_volume:/app/logs
+    networks:
+      - student_net
+
+volumes:
+  postgres_data_1:
+  logs_volume:
+
+networks:
+  student_net:
+    driver: bridge
