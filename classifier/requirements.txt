@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+torch
+transformers
+mlflow
+pandas
+numpy
+scikit-learn
+pydantic 
+peft 

@@ -45,15 +45,57 @@ services:
     networks:
       - student_net
 
-  llama-server:
+  # LLM Service - serves on port 11434 with /v1/chat/completions
+  llm:
     build:
       context: ./llm
       dockerfile: Dockerfile.simple
-    container_name: llama-server
+    container_name: llm
     ports:
-      - "8080:8080"
+      - "11434:11434"
     networks:
       - student_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Classifier Service - pulls champion model from MLflow experiments
+  classifier:
+    build: ./classifier
+    container_name: classifier
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./lora_trainer/experiments:/app/experiments
+    environment:
+      - MLFLOW_TRACKING_URI=file:///app/experiments/quick_test/mlruns
+      - PREFERRED_EXPERIMENT=high_performance_model
+    networks:
+      - student_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Orchestrator Gateway - forwards /predict to classifier and /get_message to LLM
+  orchestrator:
+    build: ./orchestrator
+    container_name: orchestrator
+    ports:
+      - "8080:8080"
+    depends_on:
+      - classifier
+      - llm
+    networks:
+      - student_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_data_1:

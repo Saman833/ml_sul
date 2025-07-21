@@ -9,7 +9,7 @@ RUN pip install fastapi uvicorn
 COPY simple_server.py .
 
 # Expose port
-EXPOSE 8080
+EXPOSE 11434
 
 # Run the server
-CMD ["uvicorn", "simple_server:app", "--host", "0.0.0.0", "--port", "8080"] 
+CMD ["uvicorn", "simple_server:app", "--host", "0.0.0.0", "--port", "11434"] 
