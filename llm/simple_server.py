@@ -4,18 +4,41 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import re
 import random
+from typing import List, Optional
 
-app = FastAPI()
+app = FastAPI(title="LLM Chat Server", version="1.0.0")
 
-class ChatRequest(BaseModel):
-    message: str
+class ChatMessage(BaseModel):
+    role: str
+    content: str
 
-class ChatResponse(BaseModel):
-    response: str
+class ChatCompletionRequest(BaseModel):
+    messages: List[ChatMessage]
+    model: Optional[str] = "llama-2-7b-chat"
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = 1000
+
+class ChatCompletionChoice(BaseModel):
+    index: int
+    message: ChatMessage
+    finish_reason: str
+
+class ChatCompletionResponse(BaseModel):
+    id: str
+    object: str = "chat.completion"
+    created: int
+    model: str
+    choices: List[ChatCompletionChoice]
 
 # Enhanced response patterns
-def generate_response(message: str) -> str:
-    message_lower = message.lower()
+def generate_response(messages: List[ChatMessage]) -> str:
+    # Get the last user message
+    user_message = ""
+    for msg in messages:
+        if msg.role == "user":
+            user_message = msg.content
+    
+    message_lower = user_message.lower()
     
     # Weather-related responses
     if any(word in message_lower for word in ['weather', 'rain', 'sun', 'cloud', 'temperature', 'hot', 'cold']):
@@ -73,7 +96,7 @@ def generate_response(message: str) -> str:
         return random.choice(help_responses)
     
     # Random characters or unclear input
-    elif len(message.strip()) < 4 or not re.search(r'[a-zA-Z]', message):
+    elif len(user_message.strip()) < 4 or not re.search(r'[a-zA-Z]', user_message):
         unclear_responses = [
             "I'm not quite sure what you mean. Could you elaborate a bit more?",
             "That's an interesting input! Could you tell me more about what you're thinking?",
@@ -96,15 +119,41 @@ def generate_response(message: str) -> str:
         ]
         return random.choice(default_responses)
 
-@app.post("/chat")
-async def chat(request: ChatRequest):
-    response = generate_response(request.message)
-    return ChatResponse(response=response)
+@app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
+async def chat_completions(request: ChatCompletionRequest):
+    """Handle chat completion requests compatible with OpenAI API"""
+    import time
+    import uuid
+    
+    response_text = generate_response(request.messages)
+    
+    response = ChatCompletionResponse(
+        id=f"chatcmpl-{uuid.uuid4().hex[:8]}",
+        created=int(time.time()),
+        model=request.model or "llama-2-7b-chat",
+        choices=[
+            ChatCompletionChoice(
+                index=0,
+                message=ChatMessage(role="assistant", content=response_text),
+                finish_reason="stop"
+            )
+        ]
+    )
+    
+    return response
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "service": "llm-chat-server"}
+
+@app.get("/")
+async def root():
+    return {
+        "service": "LLM Chat Server",
+        "version": "1.0.0",
+        "endpoints": ["/v1/chat/completions", "/health"]
+    }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080) 
+    uvicorn.run(app, host="0.0.0.0", port=11434) 
