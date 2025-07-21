@@ -114,21 +114,50 @@ def get_response_from_llm(dialog_id: UUID, request_message_text: str) -> str:
     model: str = get_model_name_for_model_operator(Config().MODEL_OPERATOR)
 
     try:
-        response_message_text = query_openai_proxy(
-            prompt=prompt,
-            model=model,
-            use_proxy=proxy_is_working
-        )
+        if Config().MODEL_OPERATOR == "llama":
+            response_message_text = query_llama_server(prompt=prompt, model=model)
+        else:
+            response_message_text = query_openai_proxy(
+                prompt=prompt,
+                model=model,
+                use_proxy=proxy_is_working
+            )
     except Exception as e:
-        logger.error(f"Error in query_openai_proxy: {str(e)}")
+        logger.error(f"Error in query: {str(e)}")
 
     if response_message_text == "":
-        logger.error("No response from OpenAI API")
+        logger.error("No response from API")
         logger.error("Returning echo response")
         response_message_text = request_message_text
 
     return response_message_text
 
+
+def query_llama_server(prompt: str, model: str = "llama-2-7b-chat") -> str:
+    """
+    Query the local llama server
+    """
+    import requests
+    
+    try:
+        response = requests.post(
+            "http://llama-server:8080/chat",
+            json={
+                "message": prompt
+            },
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            return response_data.get("response", "")
+        else:
+            logger.error(f"LLM server error: {response.status_code}")
+            return ""
+            
+    except Exception as e:
+        logger.error(f"Error querying LLM server: {str(e)}")
+        return ""
 
 def get_model_name_for_model_operator(model_operator: str) -> str:
     model_name:str
@@ -140,6 +169,8 @@ def get_model_name_for_model_operator(model_operator: str) -> str:
         model_name: str = "deepseek-chat"
     elif model_operator == "openai":
         model_name: str = "gpt-4o"
+    elif model_operator == "llama":
+        model_name: str = "tinyllama-1.1b-chat"
     else:
         logger.error(f"Unknown model_operator: {model_operator}. Using default model name: {default_model_name}")
         model_name: str = default_model_name

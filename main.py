@@ -7,7 +7,9 @@ import time
 from config import START_MODULE_MESSAGE, logger, str_object_is_created, Config
 from models_fast_api import GetMessageRequestModel, GetMessageResponseModel
 from create_answer import get_response_from_llm
+
 from database import insert_message, init_db
+
 
 
 MODULE_DESCRIPTION = "Main module for starting program. FastAPI functions are here"
